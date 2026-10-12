@@ -2,7 +2,7 @@ import "./style.css";
 import {
   SIZES, DEFAULT_SHARPEN_AMOUNT, DEFAULT_SHARPEN_THRESHOLD,
   autoSize, centerCropRect, sharpenBlend, autoBorder,
-  composeWithBorder, upscalePreview,
+  composeWithBorder, downscaleCanvas, upscalePreview,
   type Size, type Rgb,
 } from "./converter.ts";
 
@@ -141,12 +141,8 @@ function convert(): void {
   (cctx as CanvasRenderingContext2D & { imageSmoothingQuality?: string }).imageSmoothingQuality = "high";
   cctx.drawImage(state.img, cx, cy, base.w, base.h, 0, 0, base.w, base.h);
 
-  const small = document.createElement("canvas");
-  small.width = iw; small.height = ih;
+  const small = downscaleCanvas(crop, iw, ih);
   const sctx = small.getContext("2d")!;
-  sctx.imageSmoothingEnabled = true;
-  (sctx as CanvasRenderingContext2D & { imageSmoothingQuality?: ImageSmoothingQuality }).imageSmoothingQuality = "high";
-  sctx.drawImage(crop, 0, 0, iw, ih);
 
   if (state.sharpen > 0) {
     const orig = sctx.getImageData(0, 0, iw, ih);

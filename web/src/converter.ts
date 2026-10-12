@@ -180,3 +180,42 @@ export function upscalePreview(source: HTMLCanvasElement, scale: number): HTMLCa
   ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
 }
+
+export function downscaleCanvas(
+  source: HTMLCanvasElement,
+  targetW: number,
+  targetH: number,
+): HTMLCanvasElement {
+  const tw = Math.max(1, Math.round(targetW));
+  const th = Math.max(1, Math.round(targetH));
+  const makeStage = (w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] => {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, w);
+    canvas.height = Math.max(1, h);
+    const ctx = canvas.getContext("2d");
+    if (ctx === null) {
+      throw new Error("downscaleCanvas: 2d context unavailable");
+    }
+    ctx.imageSmoothingEnabled = true;
+    (ctx as CanvasRenderingContext2D & { imageSmoothingQuality?: ImageSmoothingQuality }).imageSmoothingQuality = "high";
+    return [canvas, ctx];
+  };
+  let current: HTMLCanvasElement = source;
+  let cw = source.width;
+  let ch = source.height;
+  while (cw > tw * 2 || ch > th * 2) {
+    const nw = cw > tw * 2 ? Math.max(tw, Math.floor(cw / 2)) : cw;
+    const nh = ch > th * 2 ? Math.max(th, Math.floor(ch / 2)) : ch;
+    if (nw === cw && nh === ch) {
+      break;
+    }
+    const [canvas, ctx] = makeStage(nw, nh);
+    ctx.drawImage(current, 0, 0, nw, nh);
+    current = canvas;
+    cw = nw;
+    ch = nh;
+  }
+  const [finalCanvas, finalCtx] = makeStage(tw, th);
+  finalCtx.drawImage(current, 0, 0, tw, th);
+  return finalCanvas;
+}
