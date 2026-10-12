@@ -1,0 +1,16 @@
+# build output
+node_modules/
+dist/
+web/dist/
+
+# synced sample artifacts (source of truth is images/)
+web/public/samples/*.png
+web/public/samples/*.jpg
+web/public/samples/*.jpeg
+web/public/samples/*.webp
+web/public/samples/*.bmp
+web/public/samples/*.gif
+
+# IDE
+.idea/
+*.iml
