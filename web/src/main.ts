@@ -219,7 +219,7 @@ function render(): void {
     vctx.drawImage(state.img, 0, 0, ow, H);
     vctx.imageSmoothingEnabled = false;
     vctx.drawImage(r, ow + 16, 0, rw, H);
-    if (state.grid && z >= 3) {
+    if (state.grid && z >= 3 && !state.pickerArmed) {
       const sx = rw / r.width, sy = H / r.height;
       vctx.strokeStyle = "rgba(140,211,215,0.22)"; vctx.lineWidth = 1;
       vctx.beginPath();
@@ -365,6 +365,7 @@ $("#crop-adjust").addEventListener("click", () => setCropMode(!state.cropMode));
 $("#crop-reset").addEventListener("click", () => { resetCrop(); convert(); });
 function setPickerArmed(on: boolean): void {
   state.pickerArmed = on;
+  render();
   $("#border-pick")!.classList.toggle("active", on);
   $("#border-pick")!.innerHTML = on ? "Click Image To Pick <span class=\"key\">I</span>" : "Pick Color <span class=\"key\">I</span>";
 }
@@ -431,6 +432,7 @@ function sampleImage(img: HTMLImageElement, fx: number, fy: number): Rgb {
   const sy = clampInt(fy * img.naturalHeight, 0, img.naturalHeight - 1);
   const c = document.createElement("canvas"); c.width = c.height = 1;
   const x = c.getContext("2d")!;
+  x.imageSmoothingEnabled = false;
   x.drawImage(img, sx, sy, 1, 1, 0, 0, 1, 1);
   const [r, g, b] = x.getImageData(0, 0, 1, 1).data;
   return { r: r ?? 0, g: g ?? 0, b: b ?? 0 };
@@ -449,8 +451,7 @@ view.addEventListener("pointerdown", (e) => {
       if (p.x < layout.ox + layout.ow) {
         setBorder(sampleImage(state.img, (p.x - layout.ox) / layout.ow, (p.y - layout.oy) / layout.oh));
       } else if (p.x >= layout.rx) {
-        const r = state.result;
-        setBorder(sampleCanvas(r, ((p.x - layout.rx) / layout.rw) * r.width, ((p.y - layout.oy) / layout.rh) * r.height));
+        setBorder(sampleCanvas(view, Math.floor(p.x), Math.floor(p.y)));
       } else return;
     }
     state.pickerArmed = false;
