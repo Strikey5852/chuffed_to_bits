@@ -219,3 +219,97 @@ export function downscaleCanvas(
   finalCtx.drawImage(current, 0, 0, tw, th);
   return finalCanvas;
 }
+
+/** Options for the pure single-image conversion (shared by single + bulk paths). */
+export interface ConvertOptions {
+  sizeAuto: boolean;
+  size: Size;
+  borderAuto: boolean;
+  border: Rgb;
+  sharpen: number;
+  threshold: number;
+  crop: Rect | null;
+}
+
+export interface ConvertResult {
+  canvas: HTMLCanvasElement;
+  size: Size;
+  border: Rgb;
+  crop: Rect;
+  cropLoss: number;
+}
+
+function clampIntLocal(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, Math.round(v)));
+}
+
+/** Center-crop, downscale, sharpen, border. No DOM reads; safe for bulk. */
+export function convertImage(img: HTMLImageElement, opts: ConvertOptions): ConvertResult {
+  const sw = img.naturalWidth, sh = img.naturalHeight;
+  if (!(sw > 0 && sh > 0)) {
+    throw new Error("convertImage: source image has no dimensions yet");
+  }
+  const size = opts.sizeAuto ? autoSize(sw, sh) : opts.size;
+  const iw = size.w - 2, ih = size.h - 2;
+  const base = centerCropRect(sw, sh, iw, ih);
+  let cx = base.x, cy = base.y;
+  if (opts.crop && opts.crop.w === base.w && opts.crop.h === base.h) {
+    cx = clampIntLocal(opts.crop.x, 0, sw - base.w);
+    cy = clampIntLocal(opts.crop.y, 0, sh - base.h);
+  }
+  const crop: Rect = { x: cx, y: cy, w: base.w, h: base.h };
+  const cropLoss = 1 - (base.w * base.h) / (sw * sh);
+
+  const cropCanvas = document.createElement("canvas");
+  cropCanvas.width = base.w; cropCanvas.height = base.h;
+  const cctx = cropCanvas.getContext("2d");
+  if (cctx === null) throw new Error("convertImage: 2d context unavailable");
+  cctx.imageSmoothingEnabled = true;
+  (cctx as CanvasRenderingContext2D & { imageSmoothingQuality?: string }).imageSmoothingQuality = "high";
+  cctx.drawImage(img, cx, cy, base.w, base.h, 0, 0, base.w, base.h);
+
+  const small = downscaleCanvas(cropCanvas, iw, ih);
+  const sctx = small.getContext("2d");
+  if (sctx === null) throw new Error("convertImage: 2d context unavailable");
+
+  if (opts.sharpen > 0) {
+    const orig = sctx.getImageData(0, 0, iw, ih);
+    const b1 = document.createElement("canvas");
+    b1.width = Math.max(1, iw >> 1); b1.height = Math.max(1, ih >> 1);
+    const b1x = b1.getContext("2d");
+    if (b1x === null) throw new Error("convertImage: 2d context unavailable");
+    b1x.imageSmoothingEnabled = true;
+    (b1x as CanvasRenderingContext2D & { imageSmoothingQuality?: string }).imageSmoothingQuality = "high";
+    b1x.drawImage(small, 0, 0, b1.width, b1.height);
+    const b2 = document.createElement("canvas"); b2.width = iw; b2.height = ih;
+    const b2x = b2.getContext("2d");
+    if (b2x === null) throw new Error("convertImage: 2d context unavailable");
+    b2x.imageSmoothingEnabled = true;
+    b2x.drawImage(b1, 0, 0, iw, ih);
+    const blur = b2x.getImageData(0, 0, iw, ih);
+    const full = new ImageData(iw, ih);
+    for (let i = 0; i < orig.data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const o = orig.data[i + c]!, b = blur.data[i + c]!;
+        full.data[i + c] = Math.max(0, Math.min(255, Math.round(o + (o - b))));
+      }
+      full.data[i + 3] = 255;
+    }
+    sctx.putImageData(sharpenBlend(orig, full, opts.sharpen, opts.threshold), 0, 0);
+  }
+
+  let border: Rgb;
+  if (opts.borderAuto) {
+    const c = document.createElement("canvas");
+    const w = Math.min(sw, 512), h = Math.round((Math.min(sw, 512) / sw) * sh);
+    c.width = w; c.height = h;
+    const x = c.getContext("2d");
+    if (x === null) throw new Error("convertImage: 2d context unavailable");
+    x.drawImage(img, 0, 0, w, h);
+    border = autoBorder(x.getImageData(0, 0, w, h));
+  } else {
+    border = opts.border;
+  }
+
+  return { canvas: composeWithBorder(small, border), size, border, crop, cropLoss };
+}

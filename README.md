@@ -10,7 +10,8 @@ Mumbo Jumbo or Mojang.
 ## Shortcuts
 
 `O` open · `S` save · `E` export upscaled · `I` pick border color ·
-`C` adjust crop · `G` pixel grid · `+`/`-` zoom · `Esc` leave crop
+`C` adjust crop · `G` pixel grid · `+`/`-` zoom · `Esc` leave crop/picker ·
+`←`/`→` previous/next image in batch
 
 ## Credits
 
